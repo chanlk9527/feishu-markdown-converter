@@ -1,0 +1,1371 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>飞书文档 Markdown 双向转换</title>
+  <style>
+    :root {
+      --paper: #f6f3ec;
+      --ink: #1d2320;
+      --muted: #66706b;
+      --line: #d9d2c4;
+      --panel: #fffdf7;
+      --panel-2: #ebe4d6;
+      --accent: #0d6b57;
+      --accent-dark: #084b3d;
+      --warn: #a55622;
+      --shadow: 0 18px 50px rgba(47, 39, 24, 0.12);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(29, 35, 32, 0.035) 1px, transparent 1px) 0 0 / 36px 36px,
+        linear-gradient(180deg, rgba(29, 35, 32, 0.025) 1px, transparent 1px) 0 0 / 36px 36px,
+        var(--paper);
+      font-family: ui-serif, Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+      letter-spacing: 0;
+    }
+
+    button,
+    textarea,
+    input,
+    .paste-pad {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    .shell {
+      width: min(1440px, calc(100vw - 40px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 24px 0 28px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: grid;
+      gap: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 54px);
+      line-height: 0.96;
+      font-weight: 800;
+    }
+
+    .tagline {
+      margin: 0;
+      color: var(--muted);
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+    }
+
+    .top-tools {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: end;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mode-switch {
+      display: inline-flex;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 247, 0.72);
+    }
+
+    .mode-button {
+      height: 34px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 12px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .mode-button.active {
+      color: #fff;
+      background: var(--ink);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: end;
+      gap: 8px;
+    }
+
+    .button {
+      height: 40px;
+      border: 1px solid var(--ink);
+      border-radius: var(--radius);
+      padding: 0 14px;
+      color: var(--ink);
+      background: var(--panel);
+      cursor: pointer;
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      box-shadow: 4px 4px 0 rgba(29, 35, 32, 0.16);
+    }
+
+    .button:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    .button.primary {
+      border-color: var(--accent-dark);
+      color: #fff;
+      background: var(--accent);
+    }
+
+    .button.ghost {
+      border-color: var(--line);
+      color: var(--muted);
+      background: transparent;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .pane {
+      min-width: 0;
+      min-height: 620px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 247, 0.82);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .pane-head {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .pane-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .mark {
+      width: 22px;
+      height: 22px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid var(--ink);
+      border-radius: 5px;
+      background: var(--panel-2);
+      font-size: 13px;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .paste-pad {
+      min-height: 0;
+      padding: 24px;
+      overflow: auto;
+      outline: none;
+      background: var(--panel);
+      font-size: 17px;
+      line-height: 1.72;
+    }
+
+    .paste-pad:focus {
+      box-shadow: inset 0 0 0 2px rgba(13, 107, 87, 0.22);
+    }
+
+    .paste-pad[contenteditable="true"]:empty::before {
+      content: "在这里粘贴飞书文档内容";
+      color: #9b9283;
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .output {
+      min-height: 0;
+      width: 100%;
+      resize: none;
+      border: 0;
+      outline: none;
+      padding: 24px;
+      color: #17211d;
+      background: #fbfaf5;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 14px;
+      line-height: 1.62;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .input-md {
+      min-height: 0;
+      width: 100%;
+      resize: none;
+      border: 0;
+      outline: none;
+      padding: 24px;
+      color: #17211d;
+      background: var(--panel);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 14px;
+      line-height: 1.64;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .rendered-preview {
+      background: #fffef9;
+    }
+
+    .rendered-preview h1,
+    .rendered-preview h2,
+    .rendered-preview h3 {
+      line-height: 1.16;
+      margin: 0 0 14px;
+    }
+
+    .rendered-preview h1 {
+      font-size: 34px;
+    }
+
+    .rendered-preview h2 {
+      font-size: 26px;
+    }
+
+    .rendered-preview h3 {
+      font-size: 21px;
+    }
+
+    .rendered-preview p {
+      margin: 0 0 12px;
+    }
+
+    .rendered-preview ul,
+    .rendered-preview ol {
+      margin: 0 0 14px 24px;
+      padding: 0;
+    }
+
+    .rendered-preview li {
+      margin: 4px 0;
+    }
+
+    .rendered-preview blockquote {
+      margin: 0 0 14px;
+      padding: 4px 0 4px 14px;
+      border-left: 3px solid var(--accent);
+      color: var(--muted);
+    }
+
+    .rendered-preview pre {
+      overflow: auto;
+      margin: 0 0 14px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f2eee4;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .rendered-preview code {
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: #f2eee4;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.92em;
+    }
+
+    .rendered-preview pre code {
+      padding: 0;
+      background: transparent;
+    }
+
+    .rendered-preview table {
+      width: 100%;
+      margin: 0 0 14px;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+
+    .rendered-preview th,
+    .rendered-preview td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .rendered-preview th {
+      background: #efe8db;
+      font-weight: 800;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .status {
+      min-height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      color: var(--muted);
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+    }
+
+    .status strong {
+      color: var(--accent-dark);
+    }
+
+    .drop {
+      position: fixed;
+      inset: 12px;
+      z-index: 10;
+      display: none;
+      place-items: center;
+      border: 2px dashed var(--accent);
+      border-radius: 14px;
+      color: var(--accent-dark);
+      background: rgba(246, 243, 236, 0.92);
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    body.dragging .drop {
+      display: grid;
+    }
+
+    @media (max-width: 920px) {
+      .shell {
+        width: min(100vw - 24px, 760px);
+        padding-top: 16px;
+      }
+
+      .topbar {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .actions {
+        width: 100%;
+        justify-content: start;
+      }
+
+      .top-tools {
+        width: 100%;
+        justify-content: start;
+      }
+
+      .mode-switch {
+        width: 100%;
+      }
+
+      .mode-button {
+        flex: 1 1 50%;
+      }
+
+      .button {
+        flex: 1 1 132px;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .pane {
+        min-height: 460px;
+      }
+
+      h1 {
+        font-size: 36px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <h1>飞书文档 ⇄ Markdown</h1>
+        <p class="tagline">单文件离线工具 · 双向转换 · 可复制可下载</p>
+      </div>
+      <div class="top-tools">
+        <div class="mode-switch" aria-label="转换方向">
+          <button class="mode-button active" type="button" data-mode="to-md">飞书 → MD</button>
+          <button class="mode-button" type="button" data-mode="to-feishu">MD → 飞书</button>
+        </div>
+        <div class="actions" aria-label="操作">
+          <button class="button primary" id="readClipboard" type="button">读取剪贴板</button>
+          <button class="button" id="copyMarkdown" type="button">复制 Markdown</button>
+          <button class="button" id="downloadMarkdown" type="button">下载 .md</button>
+          <button class="button ghost" id="clearAll" type="button">清空</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="workspace" aria-label="转换工作区">
+      <article class="pane">
+        <div class="pane-head">
+          <div class="pane-title"><span class="mark" id="inputMark">IN</span><span id="inputTitle">飞书粘贴区</span></div>
+          <span class="meta" id="sourceMeta">等待粘贴</span>
+        </div>
+        <div class="paste-pad" id="pastePad" contenteditable="true" spellcheck="false" aria-label="粘贴飞书内容"></div>
+        <textarea class="input-md hidden" id="markdownInput" spellcheck="false" aria-label="输入 Markdown"></textarea>
+      </article>
+
+      <article class="pane">
+        <div class="pane-head">
+          <div class="pane-title"><span class="mark" id="outputMark">MD</span><span id="outputTitle">Markdown 输出</span></div>
+          <span class="meta" id="outputMeta">0 字</span>
+        </div>
+        <textarea class="output" id="markdownOutput" spellcheck="false" aria-label="Markdown 输出"></textarea>
+        <div class="paste-pad rendered-preview hidden" id="feishuPreview" tabindex="0" aria-label="飞书富文本预览"></div>
+      </article>
+    </section>
+
+    <footer class="status">
+      <span id="statusText">打开后即可离线使用。</span>
+      <span>HTML / RTF / 纯文本</span>
+    </footer>
+  </main>
+  <div class="drop" id="dropOverlay">放开导入 HTML 文件</div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const pastePad = document.getElementById("pastePad");
+      const markdownInput = document.getElementById("markdownInput");
+      const markdownOutput = document.getElementById("markdownOutput");
+      const feishuPreview = document.getElementById("feishuPreview");
+      const sourceMeta = document.getElementById("sourceMeta");
+      const outputMeta = document.getElementById("outputMeta");
+      const statusText = document.getElementById("statusText");
+      const inputMark = document.getElementById("inputMark");
+      const inputTitle = document.getElementById("inputTitle");
+      const outputMark = document.getElementById("outputMark");
+      const outputTitle = document.getElementById("outputTitle");
+      const readClipboard = document.getElementById("readClipboard");
+      const copyMarkdown = document.getElementById("copyMarkdown");
+      const downloadMarkdown = document.getElementById("downloadMarkdown");
+      const clearAll = document.getElementById("clearAll");
+      const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
+      let currentMode = "to-md";
+
+      const blockTags = new Set([
+        "address", "article", "aside", "blockquote", "body", "dd", "details",
+        "dialog", "div", "dl", "dt", "fieldset", "figcaption", "figure",
+        "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header",
+        "hr", "html", "li", "main", "nav", "ol", "p", "pre", "section",
+        "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul"
+      ]);
+
+      const containerTags = new Set([
+        "article", "body", "div", "footer", "header", "html", "main", "nav",
+        "section", "document"
+      ]);
+
+      const ignoredTags = new Set([
+        "script", "style", "noscript", "template", "head", "meta", "link"
+      ]);
+
+      function setStatus(message, tone) {
+        statusText.textContent = message;
+        statusText.style.color = tone === "warn" ? "var(--warn)" : "var(--muted)";
+      }
+
+      function cleanInline(text) {
+        return (text || "")
+          .replace(/\u00a0/g, " ")
+          .split(/\r?\n/)
+          .map((line) => line.replace(/[ \t\f\v]+/g, " ").trim())
+          .join("\n")
+          .replace(/^\n+|\n+$/g, "");
+      }
+
+      function escapeMarkdownText(text) {
+        return text;
+      }
+
+      function preserveSpace(text, marker) {
+        if (!text || !text.trim()) return text;
+        const leading = text.match(/^\s*/)[0];
+        const trailing = text.match(/\s*$/)[0];
+        return leading + marker + text.trim() + marker + trailing;
+      }
+
+      function styleOf(node) {
+        const style = {};
+        const raw = (node.getAttribute && node.getAttribute("style")) || "";
+        raw.split(";").forEach((part) => {
+          const index = part.indexOf(":");
+          if (index === -1) return;
+          style[part.slice(0, index).trim().toLowerCase()] = part.slice(index + 1).trim().toLowerCase();
+        });
+        return style;
+      }
+
+      function isBold(node) {
+        if (!node.getAttribute) return false;
+        const weight = styleOf(node)["font-weight"] || "";
+        if (weight === "bold" || weight === "bolder") return true;
+        const number = weight.match(/\d+/);
+        return number ? Number(number[0]) >= 600 : false;
+      }
+
+      function isItalic(node) {
+        return !!node.getAttribute && (styleOf(node)["font-style"] || "").includes("italic");
+      }
+
+      function isStrike(node) {
+        if (!node.getAttribute) return false;
+        const style = node.getAttribute("style") || "";
+        return style.toLowerCase().includes("line-through");
+      }
+
+      function textContent(node) {
+        if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || "";
+        if (node.nodeType !== Node.ELEMENT_NODE) return "";
+        if (node.tagName.toLowerCase() === "br") return "\n";
+        return Array.from(node.childNodes).map(textContent).join("");
+      }
+
+      function escapeCode(text) {
+        let ticks = "`";
+        while (text.includes(ticks)) ticks += "`";
+        if (/^\s|\s$/.test(text)) return ticks + " " + text + " " + ticks;
+        return ticks + text + ticks;
+      }
+
+      function renderInline(node) {
+        if (node.nodeType === Node.TEXT_NODE) return escapeMarkdownText(node.nodeValue || "");
+        if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+        const tag = node.tagName.toLowerCase();
+        if (ignoredTags.has(tag)) return "";
+        if (tag === "br") return "\n";
+        if (tag === "hr") return "\n---\n";
+        if (tag === "img") {
+          const src = node.getAttribute("src") || "";
+          if (!src) return "";
+          const alt = cleanInline(node.getAttribute("alt") || node.getAttribute("title") || "");
+          return "![" + alt + "](" + src + ")";
+        }
+        if (tag === "input" && (node.getAttribute("type") || "").toLowerCase() === "checkbox") {
+          return node.checked || node.hasAttribute("checked") || node.getAttribute("aria-checked") === "true" ? "[x] " : "[ ] ";
+        }
+        if (tag === "code") return escapeCode(cleanInline(textContent(node)));
+
+        let content = Array.from(node.childNodes).map(renderInline).join("");
+        if (tag === "a") {
+          const href = node.getAttribute("href") || "";
+          const label = cleanInline(content) || href;
+          return href && label ? "[" + label + "](" + href + ")" : label;
+        }
+        if (tag === "strong" || tag === "b" || isBold(node)) content = preserveSpace(content, "**");
+        if (tag === "em" || tag === "i" || isItalic(node)) content = preserveSpace(content, "*");
+        if (tag === "s" || tag === "strike" || tag === "del" || isStrike(node)) content = preserveSpace(content, "~~");
+        return content;
+      }
+
+      function hasBlockChild(node) {
+        return Array.from(node.childNodes).some((child) => {
+          return child.nodeType === Node.ELEMENT_NODE && blockTags.has(child.tagName.toLowerCase()) && child.tagName.toLowerCase() !== "br";
+        });
+      }
+
+      function renderHeading(node) {
+        const level = Number(node.tagName.slice(1));
+        const text = cleanInline(Array.from(node.childNodes).map(renderInline).join(""));
+        return text ? "#".repeat(level) + " " + text : "";
+      }
+
+      function renderPre(node) {
+        let content = textContent(node).replace(/^\n+|\n+$/g, "");
+        let fence = "```";
+        while (content.includes(fence)) fence += "`";
+        return fence + "\n" + content + "\n" + fence;
+      }
+
+      function indentBlock(text, spaces) {
+        const prefix = " ".repeat(spaces);
+        return text.split("\n").map((line) => line ? prefix + line : line).join("\n");
+      }
+
+      function renderList(node, indent) {
+        const ordered = node.tagName.toLowerCase() === "ol";
+        let index = Number(node.getAttribute("start") || "1");
+        if (!Number.isFinite(index)) index = 1;
+
+        const lines = [];
+        Array.from(node.children).forEach((child) => {
+          if (child.tagName.toLowerCase() !== "li") return;
+          const marker = ordered ? index + "." : "-";
+          if (ordered) index += 1;
+          lines.push(...renderListItem(child, marker, indent));
+        });
+        return lines.join("\n");
+      }
+
+      function renderListItem(node, marker, indent) {
+        let inlineParts = [];
+        const blocks = [];
+
+        function flushInline() {
+          const text = cleanInline(inlineParts.join(""));
+          if (text) blocks.push(text);
+          inlineParts = [];
+        }
+
+        Array.from(node.childNodes).forEach((child) => {
+          if (child.nodeType === Node.ELEMENT_NODE) {
+            const tag = child.tagName.toLowerCase();
+            if (tag === "ul" || tag === "ol") {
+              flushInline();
+              blocks.push(renderList(child, indent + 1));
+              return;
+            }
+            if ((tag === "p" || tag === "div") && !hasBlockChild(child)) {
+              inlineParts.push(renderInline(child));
+              return;
+            }
+            if (blockTags.has(tag) && tag !== "br" && tag !== "span") {
+              flushInline();
+              const block = renderBlock(child, indent + 1);
+              if (block) blocks.push(block);
+              return;
+            }
+          }
+          inlineParts.push(renderInline(child));
+        });
+        flushInline();
+
+        if (!blocks.length) blocks.push(" ");
+
+        const prefix = "  ".repeat(indent) + marker + " ";
+        const continuation = " ".repeat(prefix.length);
+        const firstLines = blocks[0].split("\n");
+        const lines = [prefix + firstLines[0]];
+        firstLines.slice(1).forEach((line) => lines.push(continuation + line));
+
+        blocks.slice(1).forEach((block) => {
+          if (/^\s*(?:[-*+]|\d+\.)\s+/.test(block)) {
+            lines.push(...block.split("\n"));
+          } else {
+            lines.push(...indentBlock(block, prefix.length).split("\n"));
+          }
+        });
+        return lines;
+      }
+
+      function collectRows(node) {
+        const rows = [];
+        if (node.nodeType !== Node.ELEMENT_NODE) return rows;
+        if (node.tagName.toLowerCase() === "tr") {
+          const cells = Array.from(node.children).filter((child) => {
+            const tag = child.tagName.toLowerCase();
+            return tag === "td" || tag === "th";
+          });
+          if (cells.length) rows.push(cells);
+        }
+        Array.from(node.children).forEach((child) => rows.push(...collectRows(child)));
+        return rows;
+      }
+
+      function renderTable(node) {
+        const rows = collectRows(node);
+        if (!rows.length) return "";
+        const width = Math.max(...rows.map((row) => row.length));
+        const rendered = rows.map((row) => {
+          const cells = row.map((cell) => {
+            const text = cleanInline(Array.from(cell.childNodes).map(renderInline).join(""));
+            return text.replace(/\|/g, "\\|").replace(/\n/g, "<br>");
+          });
+          while (cells.length < width) cells.push("");
+          return cells;
+        });
+
+        const header = rendered[0];
+        const lines = [
+          "| " + header.join(" | ") + " |",
+          "| " + header.map(() => "---").join(" | ") + " |"
+        ];
+        rendered.slice(1).forEach((row) => lines.push("| " + row.join(" | ") + " |"));
+        return lines.join("\n");
+      }
+
+      function renderBlock(node, indent) {
+        if (node.nodeType === Node.TEXT_NODE) return cleanInline(node.nodeValue || "");
+        if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_NODE) return "";
+
+        const tag = node.nodeType === Node.DOCUMENT_NODE ? "document" : node.tagName.toLowerCase();
+        if (ignoredTags.has(tag)) return "";
+        if (/^h[1-6]$/.test(tag)) return renderHeading(node);
+        if (tag === "pre") return renderPre(node);
+        if (tag === "ul" || tag === "ol") return renderList(node, indent || 0);
+        if (tag === "table") return renderTable(node);
+        if (tag === "blockquote") {
+          const inner = renderBlocks(node, indent || 0);
+          return inner.split("\n").map((line) => line ? "> " + line : ">").join("\n");
+        }
+        if (tag === "hr") return "---";
+        if (tag === "p" || tag === "figcaption") {
+          return cleanInline(Array.from(node.childNodes).map(renderInline).join(""));
+        }
+        if (containerTags.has(tag)) {
+          if (hasBlockChild(node)) return renderBlocks(node, indent || 0);
+          return cleanInline(Array.from(node.childNodes).map(renderInline).join(""));
+        }
+        return cleanInline(Array.from(node.childNodes).map(renderInline).join(""));
+      }
+
+      function renderBlocks(node, indent) {
+        const blocks = [];
+        Array.from(node.childNodes).forEach((child) => {
+          const block = renderBlock(child, indent || 0);
+          if (block) blocks.push(block);
+        });
+        return blocks.join("\n\n");
+      }
+
+      function htmlToMarkdown(rawHtml) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(rawHtml || "", "text/html");
+        return renderBlocks(doc.body, 0).replace(/\n{3,}/g, "\n\n").trim() + "\n";
+      }
+
+      function textToMarkdown(text) {
+        const cleaned = (text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+        return cleaned ? cleaned + "\n" : "";
+      }
+
+      function escapeHtml(text) {
+        return String(text || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function renderMarkdownInline(text) {
+        const htmlTokens = [];
+        function stash(html) {
+          const token = "\u0000HTML" + htmlTokens.length + "\u0000";
+          htmlTokens.push(html);
+          return token;
+        }
+
+        let value = String(text || "").replace(/`([^`]+)`/g, (_, code) => {
+          return stash("<code>" + escapeHtml(code) + "</code>");
+        });
+
+        value = value.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (_, alt, src) => {
+          return stash('<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '">');
+        });
+        value = value.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (_, label, href) => {
+          return stash('<a href="' + escapeHtml(href) + '">' + renderMarkdownInline(label) + "</a>");
+        });
+
+        value = escapeHtml(value);
+        value = value
+          .replace(/~~([^~]+)~~/g, "<s>$1</s>")
+          .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+          .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+
+        htmlTokens.forEach((html, index) => {
+          value = value.replace("\u0000HTML" + index + "\u0000", html);
+        });
+        return value;
+      }
+
+      function markdownLineIndent(line) {
+        const match = line.match(/^\s*/);
+        return match ? match[0].replace(/\t/g, "    ").length : 0;
+      }
+
+      function markdownListMatch(line) {
+        const match = line.match(/^(\s*)([-+*]|\d+[.)])\s+(.*)$/);
+        if (!match) return null;
+        return {
+          indent: match[1].replace(/\t/g, "    ").length,
+          marker: match[2],
+          ordered: /^\d/.test(match[2]),
+          text: match[3]
+        };
+      }
+
+      function isMarkdownTableDivider(line) {
+        return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line || "");
+      }
+
+      function splitMarkdownRow(line) {
+        let value = (line || "").trim();
+        if (value.startsWith("|")) value = value.slice(1);
+        if (value.endsWith("|")) value = value.slice(0, -1);
+        const cells = [];
+        let current = "";
+        let escaping = false;
+        for (const char of value) {
+          if (escaping) {
+            current += char;
+            escaping = false;
+          } else if (char === "\\") {
+            escaping = true;
+          } else if (char === "|") {
+            cells.push(current.trim());
+            current = "";
+          } else {
+            current += char;
+          }
+        }
+        cells.push(current.trim());
+        return cells;
+      }
+
+      function isMarkdownBlockStart(lines, index) {
+        const line = lines[index] || "";
+        const next = lines[index + 1] || "";
+        return /^```/.test(line)
+          || /^#{1,6}\s+/.test(line)
+          || /^\s*(?:---|\*\*\*|___)\s*$/.test(line)
+          || /^>\s?/.test(line)
+          || !!markdownListMatch(line)
+          || (line.includes("|") && isMarkdownTableDivider(next));
+      }
+
+      function renderMarkdownTable(lines, index) {
+        const header = splitMarkdownRow(lines[index]);
+        let cursor = index + 2;
+        const body = [];
+        while (cursor < lines.length && lines[cursor].includes("|") && lines[cursor].trim()) {
+          body.push(splitMarkdownRow(lines[cursor]));
+          cursor += 1;
+        }
+        const width = Math.max(header.length, ...body.map((row) => row.length), 1);
+        while (header.length < width) header.push("");
+        body.forEach((row) => {
+          while (row.length < width) row.push("");
+        });
+        const headHtml = header.map((cell) => "<th>" + renderMarkdownInline(cell) + "</th>").join("");
+        const bodyHtml = body.map((row) => {
+          return "<tr>" + row.map((cell) => "<td>" + renderMarkdownInline(cell) + "</td>").join("") + "</tr>";
+        }).join("");
+        return {
+          html: "<table><thead><tr>" + headHtml + "</tr></thead><tbody>" + bodyHtml + "</tbody></table>",
+          index: cursor
+        };
+      }
+
+      function renderMarkdownList(lines, index, baseIndent, ordered) {
+        const tag = ordered ? "ol" : "ul";
+        const items = [];
+        let cursor = index;
+
+        while (cursor < lines.length) {
+          const match = markdownListMatch(lines[cursor]);
+          if (!match || match.indent < baseIndent) break;
+          if (match.indent > baseIndent) {
+            if (!items.length) break;
+            const nested = renderMarkdownList(lines, cursor, match.indent, match.ordered);
+            items[items.length - 1] += nested.html;
+            cursor = nested.index;
+            continue;
+          }
+          if (match.indent !== baseIndent || match.ordered !== ordered) break;
+
+          let itemText = match.text;
+          let itemHtml = "";
+          cursor += 1;
+
+          const checked = /^\[[xX]\]\s+/.test(itemText);
+          const unchecked = /^\[\s\]\s+/.test(itemText);
+          if (checked || unchecked) {
+            itemText = itemText.replace(/^\[[xX ]\]\s+/, "");
+            itemHtml += '<input type="checkbox" disabled' + (checked ? " checked" : "") + "> ";
+          }
+          itemHtml += renderMarkdownInline(itemText);
+
+          while (cursor < lines.length) {
+            const line = lines[cursor];
+            if (!line.trim()) {
+              cursor += 1;
+              break;
+            }
+            const nextMatch = markdownListMatch(line);
+            if (nextMatch) {
+              if (nextMatch.indent > baseIndent) {
+                const nested = renderMarkdownList(lines, cursor, nextMatch.indent, nextMatch.ordered);
+                itemHtml += nested.html;
+                cursor = nested.index;
+                continue;
+              }
+              break;
+            }
+            if (markdownLineIndent(line) > baseIndent) {
+              itemHtml += "<br>" + renderMarkdownInline(line.trim());
+              cursor += 1;
+              continue;
+            }
+            break;
+          }
+          items.push("<li>" + itemHtml + "</li>");
+        }
+
+        return { html: "<" + tag + ">" + items.join("") + "</" + tag + ">", index: cursor };
+      }
+
+      function renderMarkdownBlocks(lines, start, end) {
+        const blocks = [];
+        let index = start || 0;
+        const limit = end == null ? lines.length : end;
+
+        while (index < limit) {
+          const line = lines[index] || "";
+          if (!line.trim()) {
+            index += 1;
+            continue;
+          }
+
+          if (/^```/.test(line)) {
+            const language = line.replace(/^```/, "").trim();
+            const code = [];
+            index += 1;
+            while (index < limit && !/^```/.test(lines[index])) {
+              code.push(lines[index]);
+              index += 1;
+            }
+            if (index < limit) index += 1;
+            blocks.push('<pre><code data-language="' + escapeHtml(language) + '">' + escapeHtml(code.join("\n")) + "</code></pre>");
+            continue;
+          }
+
+          const heading = line.match(/^(#{1,6})\s+(.+)$/);
+          if (heading) {
+            const level = heading[1].length;
+            blocks.push("<h" + level + ">" + renderMarkdownInline(heading[2].trim()) + "</h" + level + ">");
+            index += 1;
+            continue;
+          }
+
+          if (/^\s*(?:---|\*\*\*|___)\s*$/.test(line)) {
+            blocks.push("<hr>");
+            index += 1;
+            continue;
+          }
+
+          if (/^>\s?/.test(line)) {
+            const quoteLines = [];
+            while (index < limit && /^>\s?/.test(lines[index])) {
+              quoteLines.push(lines[index].replace(/^>\s?/, ""));
+              index += 1;
+            }
+            blocks.push("<blockquote>" + renderMarkdownBlocks(quoteLines, 0, quoteLines.length) + "</blockquote>");
+            continue;
+          }
+
+          if (line.includes("|") && isMarkdownTableDivider(lines[index + 1] || "")) {
+            const table = renderMarkdownTable(lines, index);
+            blocks.push(table.html);
+            index = table.index;
+            continue;
+          }
+
+          const listMatch = markdownListMatch(line);
+          if (listMatch) {
+            const list = renderMarkdownList(lines, index, listMatch.indent, listMatch.ordered);
+            blocks.push(list.html);
+            index = list.index;
+            continue;
+          }
+
+          const paragraph = [line.trim()];
+          index += 1;
+          while (index < limit && lines[index].trim() && !isMarkdownBlockStart(lines, index)) {
+            paragraph.push(lines[index].trim());
+            index += 1;
+          }
+          blocks.push("<p>" + renderMarkdownInline(paragraph.join(" ")) + "</p>");
+        }
+
+        return blocks.join("");
+      }
+
+      function markdownToHtml(markdown) {
+        const lines = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+        return renderMarkdownBlocks(lines, 0, lines.length);
+      }
+
+      function richHtmlDocument(innerHtml) {
+        return '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65;color:#1d2320;}table{border-collapse:collapse;}th,td{border:1px solid #d9d2c4;padding:6px 9px;}th{background:#f2eee4;}code{background:#f2eee4;padding:1px 4px;border-radius:4px;}pre{background:#f2eee4;padding:10px;border-radius:6px;}blockquote{border-left:3px solid #0d6b57;margin-left:0;padding-left:12px;color:#66706b;}</style></head><body>' + innerHtml + "</body></html>";
+      }
+
+      function setPreviewFromHtml(rawHtml) {
+        pastePad.innerHTML = rawHtml || "";
+      }
+
+      function setPreviewFromText(text) {
+        pastePad.textContent = text || "";
+      }
+
+      function updateOutput(markdown, sourceLabel) {
+        markdownOutput.value = markdown || "";
+        sourceMeta.textContent = sourceLabel || "已转换";
+        outputMeta.textContent = (markdownOutput.value.length || 0) + " 字";
+        setStatus(markdownOutput.value ? "转换完成。" : "没有可转换内容。", markdownOutput.value ? "" : "warn");
+      }
+
+      function updateRichOutput(markdown, sourceLabel) {
+        const html = markdownToHtml(markdown);
+        feishuPreview.innerHTML = html || "";
+        sourceMeta.textContent = sourceLabel || "Markdown 输入";
+        outputMeta.textContent = (feishuPreview.innerText || "").length + " 字";
+        setStatus(html ? "富文本预览已生成，可复制到飞书。" : "没有可转换内容。", html ? "" : "warn");
+      }
+
+      function convertHtml(rawHtml, label) {
+        setPreviewFromHtml(rawHtml);
+        updateOutput(htmlToMarkdown(rawHtml), label || "HTML");
+      }
+
+      function convertText(text, label) {
+        setPreviewFromText(text);
+        updateOutput(textToMarkdown(text), label || "纯文本");
+      }
+
+      function renderMarkdownInput(label) {
+        updateRichOutput(markdownInput.value, label || "Markdown 输入");
+      }
+
+      function setMode(mode) {
+        currentMode = mode;
+        modeButtons.forEach((button) => {
+          button.classList.toggle("active", button.dataset.mode === mode);
+        });
+
+        const toMd = mode === "to-md";
+        pastePad.classList.toggle("hidden", !toMd);
+        markdownOutput.classList.toggle("hidden", !toMd);
+        markdownInput.classList.toggle("hidden", toMd);
+        feishuPreview.classList.toggle("hidden", toMd);
+
+        inputMark.textContent = toMd ? "IN" : "MD";
+        inputTitle.textContent = toMd ? "飞书粘贴区" : "Markdown 输入区";
+        outputMark.textContent = toMd ? "MD" : "FS";
+        outputTitle.textContent = toMd ? "Markdown 输出" : "飞书富文本预览";
+        readClipboard.textContent = toMd ? "读取剪贴板" : "读取 MD";
+        copyMarkdown.textContent = toMd ? "复制 Markdown" : "复制到飞书";
+        downloadMarkdown.textContent = toMd ? "下载 .md" : "下载 HTML";
+        document.getElementById("dropOverlay").textContent = toMd ? "放开导入 HTML 文件" : "放开导入 Markdown 文件";
+
+        if (!toMd && !markdownInput.value && markdownOutput.value) {
+          markdownInput.value = markdownOutput.value;
+        }
+        if (toMd) {
+          outputMeta.textContent = (markdownOutput.value.length || 0) + " 字";
+          sourceMeta.textContent = pastePad.textContent ? "HTML 粘贴" : "等待粘贴";
+          setStatus("飞书内容粘贴到左侧，右侧生成 Markdown。");
+          pastePad.focus();
+        } else {
+          renderMarkdownInput(markdownInput.value ? "Markdown 输入" : "等待输入");
+          markdownInput.focus();
+        }
+      }
+
+      pastePad.addEventListener("paste", (event) => {
+        if (currentMode !== "to-md") return;
+        const clipboard = event.clipboardData;
+        if (!clipboard) return;
+        event.preventDefault();
+        const htmlData = clipboard.getData("text/html");
+        const textData = clipboard.getData("text/plain");
+        if (htmlData) {
+          convertHtml(htmlData, "HTML 粘贴");
+        } else {
+          convertText(textData, "文本粘贴");
+        }
+      });
+
+      pastePad.addEventListener("input", () => {
+        if (currentMode !== "to-md") return;
+        const html = pastePad.innerHTML;
+        const text = pastePad.textContent || "";
+        if (html && html !== text) {
+          updateOutput(htmlToMarkdown(html), "手动编辑");
+        } else {
+          updateOutput(textToMarkdown(text), "手动编辑");
+        }
+      });
+
+      markdownInput.addEventListener("input", () => {
+        if (currentMode !== "to-feishu") return;
+        renderMarkdownInput("手动编辑");
+      });
+
+      modeButtons.forEach((button) => {
+        button.addEventListener("click", () => setMode(button.dataset.mode));
+      });
+
+      readClipboard.addEventListener("click", async () => {
+        if (currentMode === "to-feishu") {
+          if (!navigator.clipboard || !navigator.clipboard.readText) {
+            markdownInput.focus();
+            setStatus("当前浏览器不支持主动读取文本剪贴板，请在左侧粘贴 Markdown。", "warn");
+            return;
+          }
+          try {
+            const text = await navigator.clipboard.readText();
+            markdownInput.value = text || "";
+            renderMarkdownInput("剪贴板 Markdown");
+          } catch (error) {
+            markdownInput.focus();
+            setStatus("浏览器拒绝读取剪贴板，请在左侧粘贴 Markdown。", "warn");
+          }
+          return;
+        }
+
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+          pastePad.focus();
+          setStatus("当前浏览器不支持主动读取富文本剪贴板，请在左侧粘贴。", "warn");
+          return;
+        }
+        try {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            if (item.types.includes("text/html")) {
+              const blob = await item.getType("text/html");
+              convertHtml(await blob.text(), "剪贴板 HTML");
+              return;
+            }
+            if (item.types.includes("text/plain")) {
+              const blob = await item.getType("text/plain");
+              convertText(await blob.text(), "剪贴板文本");
+              return;
+            }
+          }
+          setStatus("剪贴板里没有文本内容。", "warn");
+        } catch (error) {
+          pastePad.focus();
+          setStatus("浏览器拒绝读取剪贴板，请在左侧粘贴。", "warn");
+        }
+      });
+
+      async function copyRichOutput() {
+        if (!feishuPreview.innerHTML.trim()) {
+          setStatus("没有可复制的飞书富文本。", "warn");
+          return;
+        }
+
+        const html = richHtmlDocument(feishuPreview.innerHTML);
+        const plain = feishuPreview.innerText || "";
+        try {
+          if (!navigator.clipboard || !window.ClipboardItem) throw new Error("rich clipboard unsupported");
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/html": new Blob([html], { type: "text/html" }),
+              "text/plain": new Blob([plain], { type: "text/plain" })
+            })
+          ]);
+          setStatus("飞书富文本已复制，可直接粘贴到飞书。");
+        } catch (error) {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(feishuPreview);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          const ok = document.execCommand("copy");
+          selection.removeAllRanges();
+          setStatus(ok ? "飞书富文本已复制，可直接粘贴到飞书。" : "复制失败，请手动选中右侧预览复制。", ok ? "" : "warn");
+        }
+      }
+
+      copyMarkdown.addEventListener("click", async () => {
+        if (currentMode === "to-feishu") {
+          await copyRichOutput();
+          return;
+        }
+        if (!markdownOutput.value) {
+          setStatus("没有可复制的 Markdown。", "warn");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(markdownOutput.value);
+          setStatus("Markdown 已复制。");
+        } catch (error) {
+          markdownOutput.focus();
+          markdownOutput.select();
+          const ok = document.execCommand("copy");
+          setStatus(ok ? "Markdown 已复制。" : "复制失败，请手动复制。", ok ? "" : "warn");
+        }
+      });
+
+      downloadMarkdown.addEventListener("click", () => {
+        if (currentMode === "to-feishu") {
+          if (!feishuPreview.innerHTML.trim()) {
+            setStatus("没有可下载的 HTML。", "warn");
+            return;
+          }
+          const now = new Date();
+          const stamp = [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, "0"),
+            String(now.getDate()).padStart(2, "0"),
+            "-",
+            String(now.getHours()).padStart(2, "0"),
+            String(now.getMinutes()).padStart(2, "0")
+          ].join("");
+          const blob = new Blob([richHtmlDocument(feishuPreview.innerHTML)], { type: "text/html;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "Markdown转飞书富文本-" + stamp + ".html";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          setStatus("HTML 文件已生成。");
+          return;
+        }
+
+        if (!markdownOutput.value) {
+          setStatus("没有可下载的 Markdown。", "warn");
+          return;
+        }
+        const now = new Date();
+        const stamp = [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, "0"),
+          String(now.getDate()).padStart(2, "0"),
+          "-",
+          String(now.getHours()).padStart(2, "0"),
+          String(now.getMinutes()).padStart(2, "0")
+        ].join("");
+        const blob = new Blob([markdownOutput.value], { type: "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "飞书文档转换-" + stamp + ".md";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus("Markdown 文件已生成。");
+      });
+
+      clearAll.addEventListener("click", () => {
+        pastePad.innerHTML = "";
+        markdownInput.value = "";
+        markdownOutput.value = "";
+        feishuPreview.innerHTML = "";
+        sourceMeta.textContent = "等待粘贴";
+        outputMeta.textContent = "0 字";
+        setStatus("已清空。");
+        (currentMode === "to-md" ? pastePad : markdownInput).focus();
+      });
+
+      document.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        document.body.classList.add("dragging");
+      });
+
+      document.addEventListener("dragleave", (event) => {
+        if (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight) {
+          document.body.classList.remove("dragging");
+        }
+      });
+
+      document.addEventListener("drop", async (event) => {
+        event.preventDefault();
+        document.body.classList.remove("dragging");
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (!file) return;
+        const text = await file.text();
+        if (/\.md|\.markdown|\.txt$/i.test(file.name) && currentMode === "to-feishu") {
+          markdownInput.value = text;
+          renderMarkdownInput("Markdown 文件");
+        } else if (/\.md|\.markdown$/i.test(file.name)) {
+          setMode("to-feishu");
+          markdownInput.value = text;
+          renderMarkdownInput("Markdown 文件");
+        } else if (/\.html?$/i.test(file.name) || /<html|<body|<p|<h[1-6]|<table|<ul|<ol/i.test(text)) {
+          setMode("to-md");
+          convertHtml(text, "HTML 文件");
+        } else {
+          if (currentMode === "to-feishu") {
+            markdownInput.value = text;
+            renderMarkdownInput("文本文件");
+          } else {
+            convertText(text, "文本文件");
+          }
+        }
+      });
+
+      setMode("to-md");
+    })();
+  </script>
+</body>
+</html>
