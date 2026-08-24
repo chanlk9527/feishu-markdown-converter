@@ -455,8 +455,8 @@
       </div>
       <div class="top-tools">
         <div class="mode-switch" aria-label="转换方向">
-          <button class="mode-button active" type="button" data-mode="to-md">飞书 → MD</button>
-          <button class="mode-button" type="button" data-mode="to-feishu">MD → 飞书</button>
+          <button class="mode-button" type="button" data-mode="to-md">飞书 → MD</button>
+          <button class="mode-button active" type="button" data-mode="to-feishu">MD → 飞书</button>
         </div>
         <div class="actions" aria-label="操作">
           <button class="button primary" id="readClipboard" type="button">读取剪贴板</button>
@@ -514,7 +514,7 @@
       const downloadMarkdown = document.getElementById("downloadMarkdown");
       const clearAll = document.getElementById("clearAll");
       const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
-      let currentMode = "to-md";
+      let currentMode = "to-feishu";
 
       const blockTags = new Set([
         "address", "article", "aside", "blockquote", "body", "dd", "details",
@@ -1396,7 +1396,7 @@
         }
       });
 
-      setMode("to-md");
+      setMode("to-feishu");
     })();
   </script>
 </body>
