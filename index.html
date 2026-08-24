@@ -1400,12 +1400,9 @@
           selection,
           pasteFlag
         };
-        const recordJson = JSON.stringify(record);
-
         const wrapper = document.createElement("div");
-        wrapper.setAttribute("data-page-id", rootId);
         wrapper.setAttribute("data-lark-html-role", "root");
-        wrapper.setAttribute("data-docx-has-block-data", "true");
+        wrapper.setAttribute("data-docx-has-block-data", "false");
         wrapper.innerHTML = feishuPreview.innerHTML;
         wrapper.querySelectorAll("table").forEach((table) => {
           const rows = Array.from(table.rows);
@@ -1426,18 +1423,13 @@
               cell.setAttribute("rowspan", "1");
               cell.setAttribute("style", "border:1px solid #dee0e3;padding:6px 8px;vertical-align:top;");
               const line = document.createElement("div");
-              line.className = "ace-line ace-line old-record-id-" + larkRecordId("blk");
+              line.className = "ace-line";
               while (cell.firstChild) line.appendChild(cell.firstChild);
               cell.appendChild(line);
             });
           });
         });
-        const marker = document.createElement("span");
-        marker.setAttribute("data-lark-record-data", recordJson);
-        marker.setAttribute("data-lark-record-format", "docx/record");
-        marker.className = "lark-record-clipboard";
-        wrapper.appendChild(marker);
-        return { html: wrapper.outerHTML, recordJson };
+        return { html: wrapper.outerHTML };
       }
 
       function richHtmlDocument(innerHtml) {
@@ -1636,9 +1628,6 @@
             "text/html": new Blob([html], { type: "text/html" }),
             "text/plain": new Blob([plain], { type: "text/plain" })
           };
-          if (larkPayload) {
-            clipboardData["web docx/record"] = new Blob([larkPayload.recordJson], { type: "docx/record" });
-          }
           await navigator.clipboard.write([
             new ClipboardItem(clipboardData)
           ]);
