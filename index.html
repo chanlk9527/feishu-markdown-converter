@@ -349,7 +349,6 @@
       font-size: 15px;
     }
 
-    .rendered-preview th,
     .rendered-preview td {
       border: 1px solid var(--line);
       padding: 8px 10px;
@@ -357,7 +356,7 @@
       vertical-align: top;
     }
 
-    .rendered-preview th {
+    .rendered-preview tr:first-child td {
       background: #efe8db;
       font-weight: 800;
     }
@@ -911,12 +910,14 @@
         body.forEach((row) => {
           while (row.length < width) row.push("");
         });
-        const headHtml = header.map((cell) => "<th>" + renderMarkdownInline(cell) + "</th>").join("");
+        const headHtml = header.map((cell) => {
+          return "<td><strong>" + renderMarkdownInline(cell) + "</strong></td>";
+        }).join("");
         const bodyHtml = body.map((row) => {
           return "<tr>" + row.map((cell) => "<td>" + renderMarkdownInline(cell) + "</td>").join("") + "</tr>";
         }).join("");
         return {
-          html: "<table><thead><tr>" + headHtml + "</tr></thead><tbody>" + bodyHtml + "</tbody></table>",
+          html: "<table><tbody><tr>" + headHtml + "</tr>" + bodyHtml + "</tbody></table>",
           index: cursor
         };
       }
@@ -1061,7 +1062,33 @@
       }
 
       function richHtmlDocument(innerHtml) {
-        return '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65;color:#1d2320;}table{border-collapse:collapse;}th,td{border:1px solid #d9d2c4;padding:6px 9px;}th{background:#f2eee4;}code{background:#f2eee4;padding:1px 4px;border-radius:4px;}pre{background:#f2eee4;padding:10px;border-radius:6px;}blockquote{border-left:3px solid #0d6b57;margin-left:0;padding-left:12px;color:#66706b;}</style></head><body>' + innerHtml + "</body></html>";
+        return '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65;color:#1d2320;}table{border-collapse:collapse;}td{border:1px solid #d9d2c4;padding:6px 9px;}code{background:#f2eee4;padding:1px 4px;border-radius:4px;}pre{background:#f2eee4;padding:10px;border-radius:6px;}blockquote{border-left:3px solid #0d6b57;margin-left:0;padding-left:12px;color:#66706b;}</style></head><body>' + innerHtml + "</body></html>";
+      }
+
+      function copyRichFragment() {
+        const sandbox = document.createElement("div");
+        sandbox.contentEditable = "true";
+        sandbox.setAttribute("aria-hidden", "true");
+        sandbox.style.position = "fixed";
+        sandbox.style.left = "-10000px";
+        sandbox.style.top = "0";
+        sandbox.style.width = "800px";
+        sandbox.innerHTML = feishuPreview.innerHTML;
+        document.body.appendChild(sandbox);
+
+        const selection = window.getSelection();
+        const range = document.createRange();
+        let copied = false;
+        try {
+          range.selectNodeContents(sandbox);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          copied = document.execCommand("copy");
+        } finally {
+          selection.removeAllRanges();
+          sandbox.remove();
+        }
+        return copied;
       }
 
       function setPreviewFromHtml(rawHtml) {
@@ -1220,6 +1247,11 @@
           return;
         }
 
+        if (copyRichFragment()) {
+          setStatus("已按飞书简易表格格式复制，可直接粘贴到飞书。");
+          return;
+        }
+
         const html = richHtmlDocument(feishuPreview.innerHTML);
         const plain = feishuPreview.innerText || "";
         try {
@@ -1230,7 +1262,7 @@
               "text/plain": new Blob([plain], { type: "text/plain" })
             })
           ]);
-          setStatus("飞书富文本已复制，可直接粘贴到飞书。");
+          setStatus("已按飞书简易表格格式复制，可直接粘贴到飞书。");
         } catch (error) {
           const selection = window.getSelection();
           const range = document.createRange();
