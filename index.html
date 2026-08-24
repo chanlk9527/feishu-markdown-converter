@@ -1219,17 +1219,47 @@
             snapshot.seq = "auto";
             snapshot.seq_level = "auto";
           }
+          if (snapshot.type === "bullet" || snapshot.type === "ordered") {
+            snapshot.level = settings.level || 1;
+          }
           if (snapshot.type === "ordered") snapshot.seq = "auto";
+          if (snapshot.type === "code") {
+            snapshot.language = settings.language || 1;
+            snapshot.wrap = true;
+          }
           addRecord(id, snapshot);
-          if (settings.level) payloadMap[id] = { level: settings.level };
           addTopLevelSelection(id, "text", value.length);
           return id;
         }
 
-        function createPlainTextRecord(text, type) {
+        function createPlainTextRecord(text, type, options) {
           const node = document.createElement("span");
           node.textContent = text || "";
-          return createTextRecord(node, type || "text");
+          return createTextRecord(node, type || "text", options);
+        }
+
+        function larkCodeLanguage(node) {
+          const code = node.querySelector("code");
+          const language = ((code && code.dataset.language) || "").trim().toLowerCase();
+          const languageIds = {
+            bash: 7,
+            sh: 7,
+            shell: 7,
+            go: 22,
+            golang: 22,
+            java: 29,
+            javascript: 30,
+            js: 30,
+            python: 49,
+            py: 49,
+            rust: 53,
+            sql: 56,
+            typescript: 63,
+            ts: 63,
+            yaml: 67,
+            yml: 67
+          };
+          return languageIds[language] || 1;
         }
 
         function createListRecords(list, level) {
@@ -1326,7 +1356,7 @@
           } else if (tag === "blockquote") {
             createTextRecord(node, "quote");
           } else if (tag === "pre") {
-            createPlainTextRecord(node.textContent || "", "text");
+            createPlainTextRecord(node.textContent || "", "code", { language: larkCodeLanguage(node) });
           } else if (tag === "hr") {
             createPlainTextRecord("——", "text");
           } else {
