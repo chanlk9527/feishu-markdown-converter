@@ -994,6 +994,8 @@
 
           if (/^```/.test(line)) {
             const language = line.replace(/^```/, "").trim();
+            const languageName = language.toLowerCase().replace(/[^a-z0-9_+-]/g, "");
+            const languageClass = languageName ? ' class="language-' + languageName + '"' : "";
             const code = [];
             index += 1;
             while (index < limit && !/^```/.test(lines[index])) {
@@ -1001,7 +1003,7 @@
               index += 1;
             }
             if (index < limit) index += 1;
-            blocks.push('<pre><code data-language="' + escapeHtml(language) + '">' + escapeHtml(code.join("\n")) + "</code></pre>");
+            blocks.push('<pre><code' + languageClass + ' data-language="' + escapeHtml(languageName) + '">' + escapeHtml(code.join("\n")) + "</code></pre>");
             continue;
           }
 
