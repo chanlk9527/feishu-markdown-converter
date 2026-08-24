@@ -1061,11 +1061,360 @@
         return renderMarkdownBlocks(lines, 0, lines.length);
       }
 
+      function randomUuid() {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") {
+          return window.crypto.randomUUID();
+        }
+        const bytes = new Uint8Array(16);
+        if (window.crypto && typeof window.crypto.getRandomValues === "function") {
+          window.crypto.getRandomValues(bytes);
+        } else {
+          for (let index = 0; index < bytes.length; index += 1) {
+            bytes[index] = Math.floor(Math.random() * 256);
+          }
+        }
+        bytes[6] = (bytes[6] & 15) | 64;
+        bytes[8] = (bytes[8] & 63) | 128;
+        const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+        return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
+      }
+
+      function larkRecordId(prefix) {
+        return (prefix || "blk") + randomUuid().replace(/-/g, "").slice(0, 24);
+      }
+
+      function larkInlineRuns(node, inherited, output) {
+        const styles = inherited || {};
+        const runs = output || [];
+        if (!node) return runs;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = (node.nodeValue || "").replace(/\u00a0/g, " ");
+          if (text) runs.push({ text, styles });
+          return runs;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return runs;
+
+        const tag = node.tagName.toLowerCase();
+        if (tag === "br") {
+          runs.push({ text: "\n", styles });
+          return runs;
+        }
+        if (tag === "input" && (node.getAttribute("type") || "").toLowerCase() === "checkbox") {
+          runs.push({ text: node.checked || node.hasAttribute("checked") ? "☑ " : "☐ ", styles });
+          return runs;
+        }
+        if (tag === "ul" || tag === "ol") return runs;
+
+        const next = Object.assign({}, styles);
+        if (tag === "strong" || tag === "b" || isBold(node)) next.bold = "true";
+        if (tag === "em" || tag === "i" || isItalic(node)) next.italic = "true";
+        if (tag === "s" || tag === "strike" || tag === "del" || isStrike(node)) next.strikethrough = "true";
+        if (tag === "code") next.inlineCode = "true";
+        if (tag === "a" && node.getAttribute("href")) next.link = encodeURIComponent(node.getAttribute("href"));
+        Array.from(node.childNodes).forEach((child) => larkInlineRuns(child, next, runs));
+        return runs;
+      }
+
+      function larkAttributedText(node) {
+        const rawRuns = larkInlineRuns(node, {}, []);
+        const runs = [];
+        rawRuns.forEach((run) => {
+          if (!run.text) return;
+          const key = JSON.stringify(run.styles);
+          const previous = runs[runs.length - 1];
+          if (previous && previous.key === key) {
+            previous.text += run.text;
+          } else {
+            runs.push({ text: run.text, styles: run.styles, key });
+          }
+        });
+
+        const numToAttrib = { 0: ["author", "0"] };
+        const attributeNumbers = new Map();
+        let nextNum = 1;
+        let text = "";
+        let attribs = "";
+
+        runs.forEach((run) => {
+          text += run.text;
+          let marks = "*0";
+          Object.keys(run.styles).sort().forEach((name) => {
+            const value = run.styles[name];
+            const attributeKey = name + "\u0000" + value;
+            if (!attributeNumbers.has(attributeKey)) {
+              attributeNumbers.set(attributeKey, nextNum);
+              numToAttrib[nextNum] = [name, value];
+              nextNum += 1;
+            }
+            marks += "*" + attributeNumbers.get(attributeKey).toString(36);
+          });
+          attribs += marks + "+" + run.text.length.toString(36);
+        });
+
+        if (!text) {
+          return {
+            text: { 0: "" },
+            attribs: { 0: "" },
+            apool: { numToAttrib: {}, nextNum: 0 }
+          };
+        }
+        return {
+          text: { 0: text },
+          attribs: { 0: attribs },
+          apool: { numToAttrib, nextNum }
+        };
+      }
+
+      function buildLarkClipboardPayload() {
+        if (!feishuPreview.querySelector("table")) return null;
+
+        const author = "0";
+        const rootId = larkRecordId("docx");
+        const recordMap = {};
+        const recordIds = [];
+        const blockIds = [];
+        const payloadMap = {};
+        const selection = [];
+        let selectionId = 1;
+
+        function addRecord(id, snapshot) {
+          recordMap[id] = { id, snapshot };
+        }
+
+        function addTopLevelSelection(recordId, type, textLength) {
+          const id = selectionId;
+          selectionId += 1;
+          recordIds.push(recordId);
+          blockIds.push(id);
+          if (type === "block") {
+            selection.push({ id, type: "block", recordId });
+          } else {
+            selection.push({ id, type: "text", selection: { start: 0, end: textLength || 0 }, recordId });
+          }
+        }
+
+        function createTextRecord(node, type, options) {
+          const settings = options || {};
+          const id = larkRecordId("blk");
+          const attributed = larkAttributedText(node);
+          const value = attributed.text[0] || "";
+          const snapshot = {
+            type: type || "text",
+            parent_id: rootId,
+            comments: [],
+            revisions: [],
+            locked: false,
+            hidden: false,
+            author,
+            children: [],
+            text: {
+              initialAttributedTexts: { text: attributed.text, attribs: attributed.attribs },
+              apool: attributed.apool
+            },
+            align: "left",
+            folded: false
+          };
+          if (/^heading\d$/.test(snapshot.type)) {
+            snapshot.seq = "auto";
+            snapshot.seq_level = "auto";
+          }
+          if (snapshot.type === "ordered") snapshot.seq = "auto";
+          addRecord(id, snapshot);
+          if (settings.level) payloadMap[id] = { level: settings.level };
+          addTopLevelSelection(id, "text", value.length);
+          return id;
+        }
+
+        function createPlainTextRecord(text, type) {
+          const node = document.createElement("span");
+          node.textContent = text || "";
+          return createTextRecord(node, type || "text");
+        }
+
+        function createListRecords(list, level) {
+          const type = list.tagName.toLowerCase() === "ol" ? "ordered" : "bullet";
+          Array.from(list.children).forEach((item) => {
+            if (item.tagName.toLowerCase() !== "li") return;
+            const inline = item.cloneNode(true);
+            inline.querySelectorAll("ul,ol").forEach((nested) => nested.remove());
+            createTextRecord(inline, type, { level });
+            Array.from(item.children).forEach((child) => {
+              const childTag = child.tagName.toLowerCase();
+              if (childTag === "ul" || childTag === "ol") createListRecords(child, level + 1);
+            });
+          });
+        }
+
+        function createTableRecord(table) {
+          const rows = Array.from(table.rows);
+          const columnCount = Math.max(...rows.map((row) => row.cells.length), 1);
+          const tableId = larkRecordId("tbl");
+          const columnIds = Array.from({ length: columnCount }, () => "col" + randomUuid());
+          const rowIds = rows.map(() => "row" + randomUuid());
+          const columnSet = {};
+          const cellSet = {};
+          const cellIds = [];
+          columnIds.forEach((id) => { columnSet[id] = { column_width: 200 }; });
+
+          rows.forEach((row, rowIndex) => {
+            for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+              const sourceCell = row.cells[columnIndex];
+              const cellId = larkRecordId("cel");
+              const textId = larkRecordId("txt");
+              const attributed = larkAttributedText(sourceCell || document.createElement("span"));
+              cellIds.push(cellId);
+              cellSet[rowIds[rowIndex] + columnIds[columnIndex]] = {
+                merge_info: { row_span: 1, col_span: 1 },
+                block_id: cellId
+              };
+              addRecord(cellId, {
+                type: "table_cell",
+                parent_id: tableId,
+                comments: [],
+                revisions: [],
+                locked: false,
+                hidden: false,
+                author,
+                children: [textId],
+                vertical_align: "top"
+              });
+              addRecord(textId, {
+                type: "text",
+                parent_id: cellId,
+                comments: [],
+                revisions: [],
+                locked: false,
+                hidden: false,
+                author,
+                children: [],
+                text: {
+                  initialAttributedTexts: { text: attributed.text, attribs: attributed.attribs },
+                  apool: attributed.apool
+                },
+                align: "left",
+                folded: false
+              });
+            }
+          });
+
+          addRecord(tableId, {
+            type: "table",
+            parent_id: rootId,
+            comments: [],
+            revisions: [],
+            locked: false,
+            hidden: false,
+            author,
+            columns_id: columnIds,
+            rows_id: rowIds,
+            column_set: columnSet,
+            cell_set: cellSet,
+            children: cellIds
+          });
+          addTopLevelSelection(tableId, "block");
+        }
+
+        Array.from(feishuPreview.children).forEach((node) => {
+          const tag = node.tagName.toLowerCase();
+          if (tag === "table") {
+            createTableRecord(node);
+          } else if (/^h[1-6]$/.test(tag)) {
+            createTextRecord(node, "heading" + tag.slice(1));
+          } else if (tag === "ul" || tag === "ol") {
+            createListRecords(node, 1);
+          } else if (tag === "blockquote") {
+            createTextRecord(node, "quote");
+          } else if (tag === "pre") {
+            createPlainTextRecord(node.textContent || "", "text");
+          } else if (tag === "hr") {
+            createPlainTextRecord("——", "text");
+          } else {
+            createTextRecord(node, "text");
+          }
+        });
+
+        const emptyTitle = {
+          initialAttributedTexts: { text: { 0: "" }, attribs: { 0: "" } },
+          apool: { numToAttrib: {}, nextNum: 0 }
+        };
+        addRecord(rootId, {
+          type: "page",
+          parent_id: "",
+          comments: null,
+          revisions: [],
+          locked: false,
+          hidden: false,
+          author,
+          children: recordIds.slice(),
+          text: emptyTitle,
+          align: ""
+        });
+
+        const pasteFlag = randomUuid();
+        const record = {
+          isCut: false,
+          rootId,
+          parentId: rootId,
+          blockIds,
+          recordIds,
+          recordMap,
+          payloadMap,
+          extra: {
+            channel: "saas",
+            pasteRandomId: randomUuid(),
+            mention_page_title: {},
+            external_mention_url: {}
+          },
+          isKeepQuoteContainer: false,
+          selection,
+          pasteFlag
+        };
+        const recordJson = JSON.stringify(record);
+
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-page-id", rootId);
+        wrapper.setAttribute("data-lark-html-role", "root");
+        wrapper.setAttribute("data-docx-has-block-data", "true");
+        wrapper.innerHTML = feishuPreview.innerHTML;
+        wrapper.querySelectorAll("table").forEach((table) => {
+          const rows = Array.from(table.rows);
+          const columnCount = Math.max(...rows.map((row) => row.cells.length), 1);
+          table.classList.add("ace-table");
+          table.setAttribute("data-ace-table-col-widths", Array(columnCount).fill("200").join(";"));
+          table.setAttribute("style", "border:none;border-collapse:collapse;table-layout:fixed;width:" + (columnCount * 200) + "px;");
+          const colgroup = document.createElement("colgroup");
+          for (let index = 0; index < columnCount; index += 1) {
+            const col = document.createElement("col");
+            col.setAttribute("width", "200");
+            colgroup.appendChild(col);
+          }
+          table.insertBefore(colgroup, table.firstChild);
+          rows.forEach((row) => {
+            Array.from(row.cells).forEach((cell) => {
+              cell.setAttribute("colspan", "1");
+              cell.setAttribute("rowspan", "1");
+              cell.setAttribute("style", "border:1px solid #dee0e3;padding:6px 8px;vertical-align:top;");
+              const line = document.createElement("div");
+              line.className = "ace-line ace-line old-record-id-" + larkRecordId("blk");
+              while (cell.firstChild) line.appendChild(cell.firstChild);
+              cell.appendChild(line);
+            });
+          });
+        });
+        const marker = document.createElement("span");
+        marker.setAttribute("data-lark-record-data", recordJson);
+        marker.setAttribute("data-lark-record-format", "docx/record");
+        marker.className = "lark-record-clipboard";
+        wrapper.appendChild(marker);
+        return { html: wrapper.outerHTML, recordJson };
+      }
+
       function richHtmlDocument(innerHtml) {
         return '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.65;color:#1d2320;}table{border-collapse:collapse;}td{border:1px solid #d9d2c4;padding:6px 9px;}code{background:#f2eee4;padding:1px 4px;border-radius:4px;}pre{background:#f2eee4;padding:10px;border-radius:6px;}blockquote{border-left:3px solid #0d6b57;margin-left:0;padding-left:12px;color:#66706b;}</style></head><body>' + innerHtml + "</body></html>";
       }
 
-      function copyRichFragment() {
+      function copyRichFragment(innerHtml) {
         const sandbox = document.createElement("div");
         sandbox.contentEditable = "true";
         sandbox.setAttribute("aria-hidden", "true");
@@ -1073,7 +1422,7 @@
         sandbox.style.left = "-10000px";
         sandbox.style.top = "0";
         sandbox.style.width = "800px";
-        sandbox.innerHTML = feishuPreview.innerHTML;
+        sandbox.innerHTML = innerHtml || feishuPreview.innerHTML;
         document.body.appendChild(sandbox);
 
         const selection = window.getSelection();
@@ -1247,31 +1596,40 @@
           return;
         }
 
-        if (copyRichFragment()) {
-          setStatus("已按飞书简易表格格式复制，可直接粘贴到飞书。");
-          return;
-        }
-
-        const html = richHtmlDocument(feishuPreview.innerHTML);
+        const larkPayload = buildLarkClipboardPayload();
+        const fragment = larkPayload ? larkPayload.html : feishuPreview.innerHTML;
+        const html = richHtmlDocument(fragment);
         const plain = feishuPreview.innerText || "";
         try {
           if (!navigator.clipboard || !window.ClipboardItem) throw new Error("rich clipboard unsupported");
+          const clipboardData = {
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([plain], { type: "text/plain" })
+          };
+          if (larkPayload) {
+            clipboardData["web docx/record"] = new Blob([larkPayload.recordJson], { type: "docx/record" });
+          }
           await navigator.clipboard.write([
-            new ClipboardItem({
-              "text/html": new Blob([html], { type: "text/html" }),
-              "text/plain": new Blob([plain], { type: "text/plain" })
-            })
+            new ClipboardItem(clipboardData)
           ]);
-          setStatus("已按飞书简易表格格式复制，可直接粘贴到飞书。");
+          setStatus(larkPayload ? "已复制为飞书原生简易表格，可直接粘贴。" : "飞书富文本已复制，可直接粘贴到飞书。");
         } catch (error) {
-          const selection = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(feishuPreview);
-          selection.removeAllRanges();
-          selection.addRange(range);
-          const ok = document.execCommand("copy");
-          selection.removeAllRanges();
-          setStatus(ok ? "飞书富文本已复制，可直接粘贴到飞书。" : "复制失败，请手动选中右侧预览复制。", ok ? "" : "warn");
+          if (navigator.clipboard && window.ClipboardItem) {
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  "text/html": new Blob([html], { type: "text/html" }),
+                  "text/plain": new Blob([plain], { type: "text/plain" })
+                })
+              ]);
+              setStatus(larkPayload ? "已复制飞书表格；若未显示为简易表格，请使用最新版 Chrome 或 Edge。" : "飞书富文本已复制，可直接粘贴到飞书。", larkPayload ? "warn" : "");
+              return;
+            } catch (fallbackError) {
+              // Continue to the selection-based compatibility fallback.
+            }
+          }
+          const ok = copyRichFragment(fragment);
+          setStatus(ok ? (larkPayload ? "已复制飞书表格；若未显示为简易表格，请使用最新版 Chrome 或 Edge。" : "飞书富文本已复制，可直接粘贴到飞书。") : "复制失败，请手动选中右侧预览复制。", ok && !larkPayload ? "" : "warn");
         }
       }
 
