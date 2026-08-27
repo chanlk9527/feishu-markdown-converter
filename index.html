@@ -1436,6 +1436,157 @@
       background: rgba(241, 248, 253, 0.94);
       box-shadow: inset 0 0 80px rgba(33, 137, 199, 0.07);
     }
+
+    /* Content courier mascots live outside both editing panes. */
+    .shell {
+      width: min(1760px, calc(100vw - 32px));
+    }
+
+    .workspace {
+      grid-template-columns: clamp(118px, 9vw, 164px) minmax(0, 1fr) 36px minmax(0, 1fr) clamp(118px, 9vw, 164px);
+      column-gap: 10px;
+    }
+
+    .pane-input {
+      grid-column: 2;
+    }
+
+    .pane-output {
+      grid-column: 4;
+    }
+
+    .mascot-stage {
+      position: relative;
+      align-self: center;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      border: 1px solid rgba(91, 134, 205, 0.3);
+      border-radius: 44% 44% 32% 32% / 25% 25% 18% 18%;
+      background-image: url("assets/converter-mascots.png");
+      background-repeat: no-repeat;
+      background-size: 200% 100%;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 18px 34px rgba(42, 66, 112, 0.2);
+      isolation: isolate;
+      animation: mascot-hover 4.6s ease-in-out infinite;
+    }
+
+    .mascot-stage::before {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      z-index: -1;
+      border: 1px solid rgba(33, 137, 199, 0.12);
+      border-radius: inherit;
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(213, 233, 250, 0.34));
+      box-shadow: 0 0 0 5px rgba(238, 245, 251, 0.7);
+    }
+
+    .mascot-stage::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 22px;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(33, 137, 199, 0.1), rgba(33, 137, 199, 0.72));
+      box-shadow: 0 0 10px rgba(33, 137, 199, 0.32);
+    }
+
+    .mascot-left {
+      grid-column: 1;
+      background-position: left center;
+    }
+
+    .mascot-left::after {
+      right: -26px;
+    }
+
+    .mascot-right {
+      grid-column: 5;
+      background-position: right center;
+      animation-delay: -2.3s;
+    }
+
+    .mascot-right::after {
+      left: -26px;
+      transform: scaleX(-1);
+    }
+
+    .mascot-caption {
+      position: absolute;
+      left: 50%;
+      bottom: -34px;
+      min-width: max-content;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      border: 1px solid rgba(54, 79, 121, 0.13);
+      border-radius: 999px;
+      color: #415371;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 8px 18px rgba(54, 79, 121, 0.1);
+      font-family: var(--mono-font);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      backdrop-filter: blur(10px);
+    }
+
+    .mascot-left .mascot-caption::before {
+      content: "# ";
+      color: var(--accent);
+    }
+
+    .mascot-right .mascot-caption::before {
+      content: "✓ ";
+      color: var(--mint);
+    }
+
+    .flow-node {
+      grid-column: 3;
+    }
+
+    @keyframes mascot-hover {
+      0%, 100% { transform: translateY(0) rotate(-0.4deg); }
+      50% { transform: translateY(-8px) rotate(0.7deg); }
+    }
+
+    @media (max-width: 1240px) {
+      .shell {
+        width: min(100vw - 24px, 1120px);
+      }
+
+      .workspace {
+        grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr);
+        column-gap: 10px;
+      }
+
+      .mascot-stage {
+        display: none;
+      }
+
+      .pane-input {
+        grid-column: 1;
+      }
+
+      .flow-node {
+        grid-column: 2;
+      }
+
+      .pane-output {
+        grid-column: 3;
+      }
+    }
+
+    @media (max-width: 920px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .pane-input,
+      .pane-output {
+        grid-column: 1;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1461,6 +1612,8 @@
     </header>
 
     <section class="workspace" aria-label="转换工作区">
+      <div class="mascot-stage mascot-left" aria-hidden="true"><span class="mascot-caption">内容打包中</span></div>
+
       <article class="pane pane-input">
         <div class="pane-head">
           <div class="pane-title"><span class="mark" id="inputMark">IN</span><span id="inputTitle">飞书粘贴区</span></div>
@@ -1480,6 +1633,8 @@
         <textarea class="output" id="markdownOutput" spellcheck="false" aria-label="Markdown 输出"></textarea>
         <div class="paste-pad rendered-preview hidden" id="feishuPreview" tabindex="0" aria-label="飞书富文本预览"></div>
       </article>
+
+      <div class="mascot-stage mascot-right" aria-hidden="true"><span class="mascot-caption">准备接收</span></div>
     </section>
 
     <footer class="status">
