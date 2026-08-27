@@ -1228,6 +1228,73 @@
       background: rgba(239, 246, 252, 0.55);
     }
 
+    .copy-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+    }
+
+    .button.feishu-primary {
+      min-width: 148px;
+      border-color: #2457d6;
+      color: #ffffff;
+      background: linear-gradient(135deg, #3977ff 0%, #2863ea 58%, #2456ce 100%);
+      box-shadow: 0 11px 26px rgba(51, 112, 255, 0.27), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+    }
+
+    .button.feishu-primary:hover {
+      border-color: #1f50cc;
+      color: #ffffff;
+      background: linear-gradient(135deg, #4b84ff 0%, #3370ff 58%, #285ed8 100%);
+      box-shadow: 0 14px 32px rgba(51, 112, 255, 0.34), 0 0 0 3px rgba(51, 112, 255, 0.08);
+    }
+
+    .feishu-icon {
+      position: relative;
+      width: 22px;
+      height: 22px;
+      flex: 0 0 auto;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 2px 8px rgba(16, 48, 120, 0.2);
+    }
+
+    .feishu-icon i {
+      position: absolute;
+      width: 8px;
+      height: 4px;
+      border-radius: 999px;
+    }
+
+    .feishu-icon i:nth-child(1) {
+      top: 5px;
+      left: 3px;
+      background: #3370ff;
+      transform: rotate(38deg);
+    }
+
+    .feishu-icon i:nth-child(2) {
+      top: 5px;
+      right: 3px;
+      background: #00b8d9;
+      transform: rotate(-38deg);
+    }
+
+    .feishu-icon i:nth-child(3) {
+      bottom: 5px;
+      left: 3px;
+      background: #ff7d00;
+      transform: rotate(-38deg);
+    }
+
+    .feishu-icon i:nth-child(4) {
+      right: 3px;
+      bottom: 5px;
+      background: #f54a45;
+      transform: rotate(38deg);
+    }
+
     .pane {
       border-color: rgba(54, 79, 121, 0.14);
       background: rgba(255, 255, 255, 0.9);
@@ -1385,8 +1452,8 @@
           <button class="mode-button active" type="button" data-mode="to-feishu">MD → 飞书</button>
         </div>
         <div class="actions" aria-label="操作">
-          <button class="button primary" id="readClipboard" type="button">读取剪贴板</button>
-          <button class="button" id="copyMarkdown" type="button">复制 Markdown</button>
+          <button class="button" id="readClipboard" type="button">读取 MD</button>
+          <button class="button copy-action feishu-primary" id="copyMarkdown" type="button"><span class="feishu-icon" id="feishuIcon" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="copyButtonLabel">复制到飞书</span></button>
           <button class="button" id="downloadMarkdown" type="button">下载 .md</button>
           <button class="button ghost" id="clearAll" type="button">清空</button>
         </div>
@@ -1439,6 +1506,8 @@
       const outputTitle = document.getElementById("outputTitle");
       const readClipboard = document.getElementById("readClipboard");
       const copyMarkdown = document.getElementById("copyMarkdown");
+      const copyButtonLabel = document.getElementById("copyButtonLabel");
+      const feishuIcon = document.getElementById("feishuIcon");
       const downloadMarkdown = document.getElementById("downloadMarkdown");
       const clearAll = document.getElementById("clearAll");
       const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
@@ -2447,7 +2516,9 @@
         outputMark.textContent = toMd ? "MD" : "FS";
         outputTitle.textContent = toMd ? "Markdown 输出" : "飞书富文本预览";
         readClipboard.textContent = toMd ? "读取剪贴板" : "读取 MD";
-        copyMarkdown.textContent = toMd ? "复制 Markdown" : "复制到飞书";
+        copyButtonLabel.textContent = toMd ? "复制 Markdown" : "复制到飞书";
+        copyMarkdown.classList.toggle("feishu-primary", !toMd);
+        feishuIcon.classList.toggle("hidden", toMd);
         downloadMarkdown.textContent = toMd ? "下载 .md" : "下载 HTML";
         document.getElementById("dropOverlay").textContent = toMd ? "放开导入 HTML 文件" : "放开导入 Markdown 文件";
 
