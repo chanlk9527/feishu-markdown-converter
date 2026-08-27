@@ -1460,14 +1460,23 @@
       align-self: center;
       width: 100%;
       aspect-ratio: 3 / 4;
-      border: 1px solid rgba(91, 134, 205, 0.3);
+      border: 1px solid rgba(48, 92, 178, 0.42);
       border-radius: 44% 44% 32% 32% / 25% 25% 18% 18%;
+      background: #0d1730;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 34px rgba(42, 66, 112, 0.22);
+      isolation: isolate;
+      animation: mascot-hover 4.6s ease-in-out infinite;
+    }
+
+    .mascot-art {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      border-radius: inherit;
       background-image: url("assets/converter-mascots.png");
       background-repeat: no-repeat;
       background-size: 200% 100%;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 18px 34px rgba(42, 66, 112, 0.2);
-      isolation: isolate;
-      animation: mascot-hover 4.6s ease-in-out infinite;
+      filter: saturate(1.14) contrast(1.08);
     }
 
     .mascot-stage::before {
@@ -1475,10 +1484,10 @@
       position: absolute;
       inset: -8px;
       z-index: -1;
-      border: 1px solid rgba(33, 137, 199, 0.12);
+      border: 1px solid rgba(33, 137, 199, 0.2);
       border-radius: inherit;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(213, 233, 250, 0.34));
-      box-shadow: 0 0 0 5px rgba(238, 245, 251, 0.7);
+      background: transparent;
+      box-shadow: 0 0 0 4px rgba(238, 245, 251, 0.88), 0 16px 30px rgba(54, 79, 121, 0.12);
     }
 
     .mascot-stage::after {
@@ -1493,6 +1502,9 @@
 
     .mascot-left {
       grid-column: 1;
+    }
+
+    .mascot-left .mascot-art {
       background-position: left center;
     }
 
@@ -1502,8 +1514,11 @@
 
     .mascot-right {
       grid-column: 5;
-      background-position: right center;
       animation-delay: -2.3s;
+    }
+
+    .mascot-right .mascot-art {
+      background-position: right center;
     }
 
     .mascot-right::after {
@@ -1515,13 +1530,14 @@
       position: absolute;
       left: 50%;
       bottom: -34px;
+      z-index: 3;
       min-width: max-content;
       transform: translateX(-50%);
       padding: 6px 10px;
       border: 1px solid rgba(54, 79, 121, 0.13);
       border-radius: 999px;
       color: #415371;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.97);
       box-shadow: 0 8px 18px rgba(54, 79, 121, 0.1);
       font-family: var(--mono-font);
       font-size: 10px;
@@ -1612,7 +1628,7 @@
     </header>
 
     <section class="workspace" aria-label="转换工作区">
-      <div class="mascot-stage mascot-left" aria-hidden="true"><span class="mascot-caption">内容打包中</span></div>
+      <div class="mascot-stage mascot-left" aria-hidden="true"><span class="mascot-art"></span><span class="mascot-caption">内容打包中</span></div>
 
       <article class="pane pane-input">
         <div class="pane-head">
@@ -1634,7 +1650,7 @@
         <div class="paste-pad rendered-preview hidden" id="feishuPreview" tabindex="0" aria-label="飞书富文本预览"></div>
       </article>
 
-      <div class="mascot-stage mascot-right" aria-hidden="true"><span class="mascot-caption">准备接收</span></div>
+      <div class="mascot-stage mascot-right" aria-hidden="true"><span class="mascot-art"></span><span class="mascot-caption">准备接收</span></div>
     </section>
 
     <footer class="status">
