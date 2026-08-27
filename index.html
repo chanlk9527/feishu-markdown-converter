@@ -1603,10 +1603,50 @@
         grid-column: 1;
       }
     }
+
+    /* Keep the mascot artwork ready to return without letting it reduce editor space. */
+    @media (min-width: 921px) {
+      .shell.mascots-hidden {
+        width: min(1760px, calc(100vw - 32px));
+      }
+    }
+
+    .mascots-hidden .workspace {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 28px;
+    }
+
+    .mascots-hidden .mascot-stage {
+      display: none;
+    }
+
+    .mascots-hidden .pane-input {
+      grid-column: 1;
+    }
+
+    .mascots-hidden .pane-output {
+      grid-column: 2;
+    }
+
+    .mascots-hidden .flow-node {
+      grid-column: auto;
+    }
+
+    @media (max-width: 920px) {
+      .mascots-hidden .workspace {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      .mascots-hidden .pane-input,
+      .mascots-hidden .pane-output {
+        grid-column: 1;
+      }
+    }
   </style>
 </head>
 <body>
-  <main class="shell">
+  <main class="shell mascots-hidden">
     <header class="topbar">
       <div class="brand">
         <div class="brand-kicker"><span class="signal-dot" aria-hidden="true"></span>LOCAL CONVERSION NODE</div>
